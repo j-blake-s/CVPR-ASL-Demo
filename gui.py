@@ -12,6 +12,7 @@ from PySide6.QtCore import QThread, Signal, Slot, Qt
 
 import imutils
 from dvs import DvsCam
+from model import predict_sample
 
 class CameraThread(QThread):
   frame_signal = QtCore.Signal(QImage)
@@ -94,7 +95,9 @@ class MainApp(QMainWindow):
     self.setCentralWidget(widget)
 
   def predict(self):
-    pass
+    pred = predict_sample(self.event_array)
+    self.class_label.setText(pred)
+
 
   def start_recording(self):
     self.recording = True
