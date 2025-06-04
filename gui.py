@@ -7,12 +7,12 @@ from PySide6 import QtCore, QtWidgets, QtGui
 
 from PySide6 import Qt
 from PySide6.QtWidgets import QLabel, QMainWindow, QWidget
-from PySide6.QtGui import QPixmap, QImage
+from PySide6.QtGui import QPixmap, QImage, QFont
 from PySide6.QtCore import QThread, Signal, Slot, Qt
 
 import imutils
 from dvs import DvsCam
-from model import predict_sample
+from infer import predict_sample
 
 class CameraThread(QThread):
   frame_signal = QtCore.Signal(QImage)
@@ -44,6 +44,7 @@ class MainApp(QMainWindow):
     self.index = 0
     self.event_array = None
     self.recording = False
+    self.countdown = False
     self.init_ui()
     self.show()
 
@@ -55,6 +56,7 @@ class MainApp(QMainWindow):
     # Setup Layout
     page_layout = QtWidgets.QVBoxLayout()
     image_layout = QtWidgets.QHBoxLayout() 
+    label_layout = QtWidgets.QVBoxLayout() 
     button_layout = QtWidgets.QHBoxLayout()
 
     # Image labels
@@ -67,9 +69,15 @@ class MainApp(QMainWindow):
     page_layout.addLayout(image_layout)
 
     # Class Label
-    self.class_label = QtWidgets.QLabel(str(self.index))
-    self.class_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    page_layout.addWidget(self.class_label)
+    self.display_label = QtWidgets.QLabel("Ready to Record\n (Press Record)", alignment=Qt.AlignmentFlag.AlignCenter)
+    self.display_label.setFont(QFont("Times", 24))
+    label_layout.addWidget(self.display_label)
+
+    self.class_label = QtWidgets.QLabel("Class: _______", alignment=Qt.AlignmentFlag.AlignCenter)
+    self.class_label.setFont(QFont("Times", 20))
+    label_layout.addWidget(self.class_label)
+
+    page_layout.addLayout(label_layout)
 
     # Buttons
     self.record_button = QtWidgets.QPushButton("Record")
@@ -95,27 +103,43 @@ class MainApp(QMainWindow):
     self.setCentralWidget(widget)
 
   def predict(self):
-    pred = predict_sample(self.event_array)
-    self.class_label.setText(pred)
+    if self.index == 90:
+      pred = predict_sample(self.event_array)
+      self.class_label.setText(f'Class: {pred}')
+      self.display_label.setText("Ready to Record\n (Press Record)")
 
 
   def start_recording(self):
-    self.recording = True
+    self.countdown = True
     self.event_array = None
-    self.index = 0
+    self.counter = 90
 
   @QtCore.Slot(np.ndarray)
   def storeEvents(self, events):
     if self.event_array is None:
       self.event_array = np.zeros(shape=(90, 2, events.shape[1], events.shape[2]))
 
-    if self.recording:
+    if self.countdown:
+      if self.counter <= 0:
+        self.recording = True
+        self.index = 0
+        self.countdown = False
+      else:
+        self.counter -= 1
+        label = f'Getting Ready \n{1 + (self.counter // 30)}...'
+        self.display_label.setText(label)
+
+
+    elif self.recording:
       self.event_array[self.index] = events
       self.index = (self.index + 1)
-      self.class_label.setText(str(self.index))
+      label = f'Recording \n {progressBar(self.index, max=90, length = 20)}'
+      self.display_label.setText(label)
 
       if self.index == 90:
         self.recording = False
+        self.display_label.setText("Ready to Predict! \n (Press Predict)")
+    
 
 
   @QtCore.Slot(QImage)
@@ -126,3 +150,18 @@ class MainApp(QMainWindow):
   @QtCore.Slot(QImage)
   def setDvsFrame(self, image):
     self.dvs_frame_label.setPixmap(QPixmap.fromImage(image))
+
+
+
+
+def progressBar(i, max=100, length=10):
+  
+  filledSymbol = "■"
+  emptySymbol = "□"
+  progress = int((i / max) * length)
+  bar = ""
+  for _ in range(progress): 
+    bar += filledSymbol
+  for _ in range(length-progress):
+    bar += emptySymbol
+  return bar
