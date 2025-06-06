@@ -27,7 +27,7 @@ def predict_sample(events):
   events = torch.unsqueeze(events, dim=0).to(torch.float32)
 
   # Make Model
-  model = torch.jit.load("./saved_models/model2.pt")
+  model = torch.jit.load("./saved_models/model4.pt", map_location="cpu")
   model.eval()
 
   # Prediction
