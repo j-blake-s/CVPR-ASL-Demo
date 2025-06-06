@@ -5,7 +5,7 @@ import sys
 import random
 from PySide6 import QtCore, QtWidgets, QtGui
 
-from PySide6 import Qt
+# from PySide6 import Qt
 from PySide6.QtWidgets import QLabel, QMainWindow, QWidget
 from PySide6.QtGui import QPixmap, QImage, QFont
 from PySide6.QtCore import QThread, Signal, Slot, Qt
