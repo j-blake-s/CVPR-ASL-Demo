@@ -18,11 +18,13 @@ class CameraThread(QThread):
   frame_signal = QtCore.Signal(QImage)
   dvsframe_signal = QtCore.Signal(QImage)
   event_signal = QtCore.Signal(np.ndarray)
+  data_signal = QtCore.Signal(np.ndarray)
 
   def run(self):
     self.cap = DvsCam().pair(cv2.VideoCapture(0))
     while self.cap.isOpened():
       frame, dvsFrame, dvsEvents = self.cap.read()
+      self.data_signal.emit(frame)
       frame, dvsFrame = self.cvimage_to_label(frame), self.cvimage_to_label(dvsFrame)
       self.frame_signal.emit(frame)
       self.dvsframe_signal.emit(dvsFrame)
@@ -58,6 +60,7 @@ class MainApp(QMainWindow):
     image_layout = QtWidgets.QHBoxLayout() 
     label_layout = QtWidgets.QVBoxLayout() 
     button_layout = QtWidgets.QHBoxLayout()
+    data_layout = QtWidgets.QVBoxLayout()
 
     # Image labels
     self.frame_label = QtWidgets.QLabel(alignment=Qt.AlignmentFlag.AlignCenter)
@@ -90,11 +93,58 @@ class MainApp(QMainWindow):
 
     page_layout.addLayout(button_layout)
 
+    
+    # Bandwidth
+    data_label_font = QFont("Times", 18)
+
+    bandwidth_layout = QtWidgets.QHBoxLayout()
+
+    self.rgb_bw_label = QtWidgets.QLabel("000 bits", alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight, font=data_label_font)
+    bw_label = QtWidgets.QLabel("Bandwidth", alignment=Qt.AlignmentFlag.AlignCenter, font=data_label_font)
+    self.dvs_bw_label = QtWidgets.QLabel("000 bits", alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, font=data_label_font)
+
+    bandwidth_layout.addWidget(self.rgb_bw_label)
+    bandwidth_layout.addWidget(bw_label)
+    bandwidth_layout.addWidget(self.dvs_bw_label)
+
+    data_layout.addLayout(bandwidth_layout)
+
+    # Throughput
+    throughput_layout = QtWidgets.QHBoxLayout()
+
+    self.rgb_tp_label = QtWidgets.QLabel("000 bits", alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight, font=data_label_font)
+    tp_label = QtWidgets.QLabel("Throughput", alignment=Qt.AlignmentFlag.AlignCenter, font=data_label_font)
+    self.dvs_tp_label = QtWidgets.QLabel("000 bits", alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, font=data_label_font)
+
+    throughput_layout.addWidget(self.rgb_tp_label)
+    throughput_layout.addWidget(tp_label)
+    throughput_layout.addWidget(self.dvs_tp_label)
+
+    data_layout.addLayout(throughput_layout)
+
+    # Data Transfer
+    datatransfer_layout = QtWidgets.QHBoxLayout()
+
+    self.rgb_dt_label = QtWidgets.QLabel("000 bits", alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight, font=data_label_font)
+    dt_label = QtWidgets.QLabel("Data Transfer", alignment=Qt.AlignmentFlag.AlignCenter, font=data_label_font)
+    self.dvs_dt_label = QtWidgets.QLabel("000 bits", alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, font=data_label_font)
+
+    datatransfer_layout.addWidget(self.rgb_dt_label)
+    datatransfer_layout.addWidget(dt_label)
+    datatransfer_layout.addWidget(self.dvs_dt_label)
+    
+    data_layout.addLayout(datatransfer_layout)
+
+
+    page_layout.addLayout(data_layout)
+
+
     # Camera Thread
     self.camera_thread = CameraThread()
     self.camera_thread.frame_signal.connect(self.setFrame)
     self.camera_thread.dvsframe_signal.connect(self.setDvsFrame)
     self.camera_thread.event_signal.connect(self.storeEvents)
+    self.camera_thread.data_signal.connect(self.frameStats)
     self.camera_thread.start()
 
     # Setup Widget
@@ -139,12 +189,28 @@ class MainApp(QMainWindow):
       if self.index == 90:
         self.recording = False
         self.display_label.setText("Ready to Predict! \n (Press Predict)")
-    
 
+    # Bandwidth
+    data_bw_bits = np.prod(events.shape) * 1 * 30
+    self.dvs_bw_label.setText(f'{formatBits(data_bw_bits)}bits/s')
+
+    
+    # Throughput
+    data_tp_bits = np.count_nonzero(events) * 30
+    self.dvs_tp_label.setText(f'{formatBits(data_tp_bits)}events/s')
+
+
+
+  def frameStats(self, frame):
+
+    # Bandwidth
+    frame_bits = np.prod(frame.shape) * 8 * 30
+    self.rgb_bw_label.setText(f'{formatBits(frame_bits)}bits/s')
 
   @QtCore.Slot(QImage)
   def setFrame(self, image):
     self.frame_label.setPixmap(QPixmap.fromImage(image))
+
 
   
   @QtCore.Slot(QImage)
@@ -153,6 +219,17 @@ class MainApp(QMainWindow):
 
 
 
+
+def formatBits(bits):
+  endSet = ["", "kilo", "mega", "giga"]
+
+  end = 0
+
+  while bits >= 1024:
+    bits = bits / 1024
+    end += 1
+
+  return f'{round(bits,1)} {endSet[end]}'
 
 def progressBar(i, max=100, length=10):
   
