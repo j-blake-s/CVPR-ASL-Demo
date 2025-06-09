@@ -47,10 +47,22 @@ class MainApp(QMainWindow):
     self.event_array = None
     self.recording = False
     self.countdown = False
+    self.num_events = None
+    self.num_event_index = 0
     self.init_ui()
     self.show()
 
   def init_ui(self):
+
+    # Settings
+    font_style = "Times"
+    display_label_font = QFont(font_style, 24)
+    class_label_font = QFont(font_style, 24)
+    data_label_font = QFont(font_style, 20)
+    button_font = QFont(font_style, 24, QFont.Bold)
+    button_size = lambda x : x.setFixedSize(700, 100)
+
+
     # Setup Window
     self.showMaximized()
     self.setWindowTitle("CVPR Asl Demo")
@@ -60,7 +72,6 @@ class MainApp(QMainWindow):
     image_layout = QtWidgets.QHBoxLayout() 
     label_layout = QtWidgets.QVBoxLayout() 
     button_layout = QtWidgets.QHBoxLayout()
-    data_layout = QtWidgets.QVBoxLayout()
 
     # Image labels
     self.frame_label = QtWidgets.QLabel(alignment=Qt.AlignmentFlag.AlignCenter)
@@ -73,71 +84,47 @@ class MainApp(QMainWindow):
 
     # Class Label
     self.display_label = QtWidgets.QLabel("Ready to Record\n (Press Record)", alignment=Qt.AlignmentFlag.AlignCenter)
-    self.display_label.setFont(QFont("Times", 24))
+    self.display_label.setFont(display_label_font)
     label_layout.addWidget(self.display_label)
 
     self.class_label = QtWidgets.QLabel("Class: _______", alignment=Qt.AlignmentFlag.AlignCenter)
-    self.class_label.setFont(QFont("Times", 20))
+    self.class_label.setFont(class_label_font)
     label_layout.addWidget(self.class_label)
 
     page_layout.addLayout(label_layout)
 
-    # Buttons
-    self.record_button = QtWidgets.QPushButton("Record")
-    self.record_button.pressed.connect(self.start_recording)
-    button_layout.addWidget(self.record_button)
 
-    self.predict_button = QtWidgets.QPushButton("Predict")
-    self.predict_button.pressed.connect(self.predict)
-    button_layout.addWidget(self.predict_button)
-
-    page_layout.addLayout(button_layout)
 
     
     # Bandwidth
-    data_label_font = QFont("Times", 18)
 
     bandwidth_layout = QtWidgets.QHBoxLayout()
 
-    self.rgb_bw_label = QtWidgets.QLabel("000 bits", alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight, font=data_label_font)
+    self.rgb_bw_label = QtWidgets.QLabel("---", alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight, font=data_label_font)
     bw_label = QtWidgets.QLabel("Bandwidth", alignment=Qt.AlignmentFlag.AlignCenter, font=data_label_font)
-    self.dvs_bw_label = QtWidgets.QLabel("000 bits", alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, font=data_label_font)
+    self.dvs_bw_label = QtWidgets.QLabel("---", alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, font=data_label_font)
 
     bandwidth_layout.addWidget(self.rgb_bw_label)
     bandwidth_layout.addWidget(bw_label)
     bandwidth_layout.addWidget(self.dvs_bw_label)
 
-    data_layout.addLayout(bandwidth_layout)
-
-    # Throughput
-    throughput_layout = QtWidgets.QHBoxLayout()
-
-    self.rgb_tp_label = QtWidgets.QLabel("000 bits", alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight, font=data_label_font)
-    tp_label = QtWidgets.QLabel("Throughput", alignment=Qt.AlignmentFlag.AlignCenter, font=data_label_font)
-    self.dvs_tp_label = QtWidgets.QLabel("000 bits", alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, font=data_label_font)
-
-    throughput_layout.addWidget(self.rgb_tp_label)
-    throughput_layout.addWidget(tp_label)
-    throughput_layout.addWidget(self.dvs_tp_label)
-
-    data_layout.addLayout(throughput_layout)
-
-    # Data Transfer
-    datatransfer_layout = QtWidgets.QHBoxLayout()
-
-    self.rgb_dt_label = QtWidgets.QLabel("000 bits", alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight, font=data_label_font)
-    dt_label = QtWidgets.QLabel("Data Transfer", alignment=Qt.AlignmentFlag.AlignCenter, font=data_label_font)
-    self.dvs_dt_label = QtWidgets.QLabel("000 bits", alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, font=data_label_font)
-
-    datatransfer_layout.addWidget(self.rgb_dt_label)
-    datatransfer_layout.addWidget(dt_label)
-    datatransfer_layout.addWidget(self.dvs_dt_label)
-    
-    data_layout.addLayout(datatransfer_layout)
+    page_layout.addLayout(bandwidth_layout)
 
 
-    page_layout.addLayout(data_layout)
+    # Buttons
+    self.record_button = QtWidgets.QPushButton("Record")
+    self.record_button.setFont(button_font)
+    button_size(self.record_button)
+    self.record_button.pressed.connect(self.start_recording)
+    button_layout.addWidget(self.record_button)
 
+    self.predict_button = QtWidgets.QPushButton("Predict")
+    self.predict_button.setFont(button_font)
+    button_size(self.predict_button)
+    self.predict_button.pressed.connect(self.predict)
+    button_layout.addWidget(self.predict_button)
+
+    page_layout.addLayout(button_layout)
 
     # Camera Thread
     self.camera_thread = CameraThread()
@@ -168,6 +155,9 @@ class MainApp(QMainWindow):
   def storeEvents(self, events):
     if self.event_array is None:
       self.event_array = np.zeros(shape=(90, 2, events.shape[1], events.shape[2]))
+    
+    if self.num_events is None:
+      self.num_events = np.zeros(shape=(30,1))
 
     if self.countdown:
       if self.counter <= 0:
@@ -191,21 +181,25 @@ class MainApp(QMainWindow):
         self.display_label.setText("Ready to Predict! \n (Press Predict)")
 
     # Bandwidth
-    data_bw_bits = np.prod(events.shape) * 1 * 30
-    self.dvs_bw_label.setText(f'{formatBits(data_bw_bits)}bits/s')
+    dvs_max_bw = np.prod(events.shape) * 1 * 30 / 8
+    dvs_active_bw = np.count_nonzero(events) / 8
+
+    self.num_events[self.num_event_index] = dvs_active_bw
+    self.num_event_index = (self.num_event_index + 1) % 30
+
+    dvs_max_bw_format = formatBits(dvs_max_bw)
+    dvs_active_bw_format = formatBits(np.sum(self.num_events))
+    self.dvs_bw_label.setText(f'{dvs_active_bw_format}b/s | {dvs_max_bw_format}b/s')
 
     
-    # Throughput
-    data_tp_bits = np.count_nonzero(events) * 30
-    self.dvs_tp_label.setText(f'{formatBits(data_tp_bits)}events/s')
 
 
 
   def frameStats(self, frame):
 
     # Bandwidth
-    frame_bits = np.prod(frame.shape) * 8 * 30
-    self.rgb_bw_label.setText(f'{formatBits(frame_bits)}bits/s')
+    frame_bits = np.prod(frame.shape) * 8 * 30 / 8
+    self.rgb_bw_label.setText(f'{formatBits(frame_bits)}b/s')
 
   @QtCore.Slot(QImage)
   def setFrame(self, image):
@@ -221,7 +215,7 @@ class MainApp(QMainWindow):
 
 
 def formatBits(bits):
-  endSet = ["", "kilo", "mega", "giga"]
+  endSet = ["", "K", "M", "G"]
 
   end = 0
 
